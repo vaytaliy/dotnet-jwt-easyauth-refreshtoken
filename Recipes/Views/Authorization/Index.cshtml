@@ -1,0 +1,14 @@
+﻿@model Recipes.Models.User
+
+<form asp-controller="Authorization" asp-action="Login" method="get">
+    <div>
+        <input type="text" name="userName"/>
+        <label>Username</label>
+    </div>
+    <div>
+        <input type="password" name="password" />
+        <label>Password</label>
+    </div>
+    <input type="submit"/>
+</form>
+

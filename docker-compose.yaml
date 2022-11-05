@@ -1,0 +1,7 @@
+db:
+  image: 'mcr.microsoft.com/mssql/server:2019-latest'
+  ports:
+    - '1434:1433'
+  environment:
+    - ACCEPT_EULA=Y
+    - SA_PASSWORD=123Baix937x8>3
