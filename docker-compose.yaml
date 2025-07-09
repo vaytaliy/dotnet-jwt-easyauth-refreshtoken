@@ -1,7 +1,16 @@
-db:
-  image: 'mcr.microsoft.com/mssql/server:2019-latest'
-  ports:
-    - '1434:1433'
-  environment:
-    - ACCEPT_EULA=Y
-    - SA_PASSWORD=123Baix937x8>3
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: auth_server
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=123Baix937x8>3
+      - MSSQL_TCP_PORT=1433  # Change port as needed
+    ports:
+      - "1434:1433"  # Host:Container port mapping
+    volumes:
+      - authdevdata:/var/opt/mssql #Specify own path
+    # networks:
+    #   - sqlserver_network
+volumes:
+  authdevdata:

@@ -1,0 +1,28 @@
+DROP TABLE IF EXISTS UsersAndRoles;
+DROP TABLE IF EXISTS Users;
+DROP TABLE IF EXISTS Roles;
+
+CREATE TABLE Users (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Username NVARCHAR(255) NOT NULL,
+    Password NVARCHAR(255) NOT NULL,
+    Email NVARCHAR(255) NOT NULL UNIQUE,
+    IsVerified BIT NOT NULL DEFAULT 0,
+    RefreshToken NVARCHAR(500) NULL,
+    RefreshTokenExpirationUTC DATETIME2 NULL
+);
+
+-- Create Roles table
+CREATE TABLE Roles (
+    RoleName NVARCHAR(100) PRIMARY KEY,
+    RoleDescription NVARCHAR(500) NULL
+);
+
+-- Create UsersAndRoles table (Junction table for Many-to-Many relationship)
+CREATE TABLE UsersAndRoles (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    UserId INT NOT NULL,
+    RoleName NVARCHAR(100) NOT NULL,
+    FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE,
+    FOREIGN KEY (RoleName) REFERENCES Roles(RoleName) ON DELETE CASCADE
+);

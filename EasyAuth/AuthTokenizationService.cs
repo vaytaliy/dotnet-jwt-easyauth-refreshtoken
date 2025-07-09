@@ -12,48 +12,88 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace EasyAuth
 {
-    public enum JWTTokenTypes
-    {
-        EmailVerification,
-        Authorization
-    }
-    public class AuthTokenizationService : ITokenizationService
+
+    public class AuthTokenizationService
     {
         private readonly JwtLibOptions _options;
-        public AuthTokenizationService(IOptionsMonitor<JwtLibOptions> opts)
+        private readonly string _authority;
+        private readonly string _audience;
+        private readonly int _authTokenExpirationMinutes;
+        private readonly string _authKey;
+        private readonly bool _validateIssuer;
+        private readonly bool _validateAudience;
+        private readonly bool _validateLifetime;
+        private readonly bool _validateIssuerSigningKey;
+        private readonly bool _cookieHttpOnly;
+        private readonly bool _cookieSecure;
+        public AuthTokenizationService(
+            IOptionsMonitor<JwtLibOptions> opts,
+            IConfiguration configuration)
         {
+            var authConfigPart = configuration.GetSection("AuthSettings");
             _options = opts.CurrentValue;
+            //Secrets
+
+            _authKey = _options.SecretAuthKey;
+
+            //Config
+            _authority = authConfigPart["Authority"];
+            _audience = authConfigPart["Audience"];
+            _authTokenExpirationMinutes = authConfigPart.GetValue("AuthTokenExpirationMinutes", 5);
+
+            _validateIssuer = bool.Parse(authConfigPart["ValidationParameters:ValidateIssuer"]);
+            _validateAudience = bool.Parse(authConfigPart["ValidationParameters:ValidateAudience"]);
+            _validateLifetime = bool.Parse(authConfigPart["ValidationParameters:ValidateLifetime"]);
+            _validateIssuerSigningKey = bool.Parse(authConfigPart["ValidationParameters:ValidateIssuerSigningKey"]);
+
+            //Cookie conf
+            _cookieHttpOnly = authConfigPart.GetValue("CookieParameters:HttpOnly", false);
+            _cookieSecure = authConfigPart.GetValue("CookieParameters:Secure", false);
+              //      "CookieParameters": {
+              //          "HttpOnly": "false",
+              //"Secure":  "false"
         }
 
         public JwtLibOptions GetOptions()
         {
             return _options;
         }
-        
+
         public string GenerateAccessToken(ClaimsIdentity identity)
         {
+            //_configuration["AuthRefreshTokenExpirationMinutes"]
 
             var jwtAccessTokenObj = new JwtSecurityToken(
-            issuer: _options.Authority,
-            audience: _options.Audience,
+            issuer: _authority,
+            audience: _audience,
             notBefore: DateTime.UtcNow,
             claims: identity.Claims,
-            expires: DateTime.UtcNow.AddMinutes(_options.AuthTokenExpirationMinutes),
-            signingCredentials: new SigningCredentials(GetSymmetricSecurityKey(_options.AuthKey),
+            expires: DateTime.UtcNow.AddMinutes(_authTokenExpirationMinutes),
+            signingCredentials: new SigningCredentials(GetSymmetricSecurityKey(_authKey),
             SecurityAlgorithms.HmacSha256)
             );
 
-            var accessToken = new JwtSecurityTokenHandler().WriteToken(jwtAccessTokenObj);
-            return accessToken;
+            var token = new JwtSecurityTokenHandler().WriteToken(jwtAccessTokenObj);
+            return token;
         }
 
-        public static ClaimsIdentity GetIdentity(string username) //used for jwt gen
+        public static ClaimsIdentity GetIdentity(string username, string email, bool isVerified = false, List<string> roles = null) //used for jwt gen
         {
+            List<Claim> claims =
+            [
+                //new ("Verified", isVerified.ToString().ToLower()),
+                new (ClaimTypes.Name, username),
+                new (ClaimTypes.Email, email)
+            ];
 
-            var claims = new List<Claim>
+            if (roles != null)
+            {
+                foreach (var role in roles)
                 {
-                    new Claim(ClaimTypes.Name, username),
-                };
+                    claims.Add(new Claim(ClaimTypes.Role, role));
+                }
+            }
+
 
             ClaimsIdentity claimsIdentity = new(
                 claims: claims,
@@ -73,7 +113,7 @@ namespace EasyAuth
             return ticks;
         }
 
-        public static bool CheckAccessTokenIsValid(string token)
+        public static bool CheckTokenNotExpired(string token)
         {
             var tokenTicks = GetTokenExpirationTime(token);
             var tokenDate = DateTimeOffset.FromUnixTimeSeconds(tokenTicks).UtcDateTime;
@@ -85,15 +125,15 @@ namespace EasyAuth
             return valid;
         }
 
-        public ClaimsPrincipal GetPrincipalCheckAccessTokenNoLifetime(string token)
+        public ClaimsPrincipal ValidateTokenGetPrincipal(string token)
         {
             var tokenValidationParameters = new TokenValidationParameters
             {
-                ValidateIssuer = false,
-                ValidateAudience = false,
-                ValidateLifetime = false, //not checking token lifetime because if its an expired token, this will fail
-                IssuerSigningKey = GetSymmetricSecurityKey(_options.AuthKey),
-                ValidateIssuerSigningKey = true,
+                ValidateIssuer = _validateIssuer,
+                ValidateAudience = _validateAudience,
+                ValidateLifetime = _validateLifetime, //Don't check for access token lifetime because if its an expired access token, this will fail. do check refresh token!
+                IssuerSigningKey = GetSymmetricSecurityKey(_authKey),
+                ValidateIssuerSigningKey = _validateIssuerSigningKey,  //was true
             };
 
             var tokenHandler = new JwtSecurityTokenHandler();
@@ -123,14 +163,14 @@ namespace EasyAuth
             return new SymmetricSecurityKey(Encoding.ASCII.GetBytes(key));
         }
 
-        public static HttpContext AppendCookiesToResponse(TokenModel tokens, HttpContext httpContext)
+        public HttpContext AppendCookiesToResponse(TokenModel tokens, HttpContext httpContext)
         {
             var cookieOptions = new CookieOptions()
             {
                 Path = "/",
                 IsEssential = true,
-                HttpOnly = false,
-                Secure = false
+                HttpOnly = _cookieHttpOnly,
+                Secure = _cookieSecure
             };
 
             httpContext.Response.Cookies.Append("session", tokens.AccessToken, cookieOptions);
@@ -138,41 +178,13 @@ namespace EasyAuth
             return httpContext;
         }
 
-        public static bool CheckTokenLifetimeIsValid(DateTime? expiryDateTime)
+        public static bool CheckTokenLifetimeIsValid(DateTime? notBefore, DateTime? expires, SecurityToken token, TokenValidationParameters @params)
         {
-            if (expiryDateTime != null)
+            if (expires != null)
             {
-                return expiryDateTime >= DateTime.UtcNow;
+                return expires >= DateTime.UtcNow;
             }
             return false;
-        }
-
-        public static HttpContext AppendTokensToResponseHeaders(TokenModel tokens, HttpContext httpContext)
-        {
-            httpContext.Response.Headers["Authorization"] = $"Bearer {tokens.AccessToken}";
-            httpContext.Response.Headers["Authorization-Refresh"] = $"{tokens.RefreshToken}";
-            return httpContext;
-        }
-
-        public static HttpContext RewriteAccessTokenHeader(string accessToken, HttpContext httpContext)
-        {
-            httpContext.Request.Headers["Authorization"] = $"Bearer {accessToken}";
-            return httpContext;
-        }
-
-        public static TokenModel GetCookiesFromRequest(HttpContext httpContext)
-        {
-            var tokens = new TokenModel() {
-                AccessToken = httpContext.Request.Cookies["session"],
-                RefreshToken = httpContext.Request.Cookies["refresh_session"]
-            };
-            return tokens;
-        }
-
-        public static bool LifetimeValidator(DateTime? notBefore, DateTime? expires, SecurityToken token, TokenValidationParameters @params)
-        {
-            var isValid = CheckTokenLifetimeIsValid(expires);
-            return isValid;
         }
     }
 }
