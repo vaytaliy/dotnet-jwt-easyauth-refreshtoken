@@ -21,6 +21,6 @@ namespace App.Models
         public bool IsVerified { get; set; }
         public string RefreshToken { get; set; }
         public DateTime RefreshTokenExpirationUTC { get; set; }
-        //public string AssignedRoles { get; set; }
+        public DateTime SecurityStamp { get; set; }
     }
 }

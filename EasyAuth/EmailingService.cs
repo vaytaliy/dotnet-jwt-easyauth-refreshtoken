@@ -181,18 +181,18 @@ namespace EasyAuth
         }
 
         public async Task SendVerificationEmail(
-            string emailTo, string username, List<string> userRoles)
+            string emailTo, string username, DateTime securityStamp, List<string> userRoles)
         {            
             var message = new MimeMessage();
             message.From.Add(new MailboxAddress("Authorization Test", _senderAddress));
             message.To.Add(new MailboxAddress("Recepient", emailTo));
             message.Subject = _messageSubject;
 
-            var ci = AuthTokenizationService.GetIdentity(username, emailTo, false, userRoles);
+            var ci = AuthTokenizationService.GetIdentity(username, emailTo, securityStamp, false, userRoles);
             var token = GenerateEmailingToken(ci);
             var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
 
-            var fullURL = $"{_hostURL}/{_authURL}/{_verificationPath}/{encodedToken}";
+            var fullURL = $"{_hostURL}/{_authURL}/{_verificationPath}?verificationToken={encodedToken}";
 
             var messageBodyText = _messagePattern.Replace("@username", username).Replace("@url", fullURL);
 

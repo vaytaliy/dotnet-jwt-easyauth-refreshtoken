@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authentication;
+﻿using EasyAuth.Interfaces;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -12,6 +13,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http.Headers;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -97,6 +99,20 @@ namespace EasyAuth
                         var result = JsonSerializer.Serialize(res);
 
                         return context.Response.WriteAsync(result);
+                    },
+
+                    OnTokenValidated = async context =>
+                    {
+                        var username = context.Principal.FindFirstValue(ClaimTypes.Name);
+                        var stamp = context.Principal.FindFirst("stamp")?.Value;
+
+                        var db = context.HttpContext.RequestServices.GetRequiredService<IAuthUserRepository>();
+                        var user = await db.GetUserByName(username);
+
+                        if (user == null || user.SecurityStamp.ToString() != stamp)
+                        {
+                            context.Fail("Token is invalid due to credential change");
+                        }
                     }
                 };
             });

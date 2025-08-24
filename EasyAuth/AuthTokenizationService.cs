@@ -77,12 +77,13 @@ namespace EasyAuth
             return token;
         }
 
-        public static ClaimsIdentity GetIdentity(string username, string email, bool isVerified = false, List<string> roles = null) //used for jwt gen
+        public static ClaimsIdentity GetIdentity(string username, string email, DateTime securityStamp, bool isVerified = false, List<string> roles = null) //used for jwt gen
         {
             List<Claim> claims =
             [
                 //new ("Verified", isVerified.ToString().ToLower()),
                 new (ClaimTypes.Name, username),
+                new ("stamp", securityStamp.ToString()),
                 new (ClaimTypes.Email, email)
             ];
 

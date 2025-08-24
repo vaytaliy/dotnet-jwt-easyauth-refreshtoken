@@ -25,7 +25,7 @@ namespace EasyAuth.Interfaces
         public async Task<TokenModel> AuthorizeWithPasswordGetToken(IAuthUser foundUser, List<string> userRoles, string inputPassword)
         {
 
-            var identity = AuthTokenizationService.GetIdentity(foundUser.Username, foundUser.Email, foundUser.IsVerified, userRoles);
+            var identity = AuthTokenizationService.GetIdentity(foundUser.Username, foundUser.Email, foundUser.SecurityStamp, foundUser.IsVerified, userRoles);
 
             if (!PasswordHasher.PasswordsMatch(foundUser.Password, foundUser.Username, inputPassword))
             {

@@ -38,6 +38,16 @@ namespace App
 
             PasswordHasher.SetSalt(Configuration["Salt"]);
             //[A] It's up to user how secrets are brought in
+
+            //Make sure the following keys are set in your secrets store or environment:
+
+            //SecretAuthKey (make sure string is long enough,256b minimum for hashing algorithm)
+            //Salt (make sure string is long enough, 256b minimum for hashing algorithm)
+            //EmailSecretAuthKey (make sure string is long enough, 256b minimum for hashing algorithm)
+            //EmailUser (Email account username used for sending emails to users)
+            //EmailPassword (Email account password used for sending emails to users)
+            //EmailSecretRecoveryKey (make sure string is long enough, 256b minimum for hashing algorithm)
+
             services.AddAuthOptions(o =>
             {
                 o.SecretAuthKey = Configuration["SecretAuthKey"];
@@ -52,8 +62,6 @@ namespace App
                     o.SecretAuthKey = Configuration["SecretAuthKey"];
                 }
                 );
-
-
 
             //provide your data provider for simple auth, it can be any database and logic or involved dependencies
             //must be set up manually

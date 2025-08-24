@@ -1,3 +1,11 @@
+IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'AuthDb')
+BEGIN
+    CREATE DATABASE AuthDb;
+END
+GO
+
+USE AuthDb;
+
 DROP TABLE IF EXISTS UsersAndRoles;
 DROP TABLE IF EXISTS Users;
 DROP TABLE IF EXISTS Roles;
@@ -9,16 +17,15 @@ CREATE TABLE Users (
     Email NVARCHAR(255) NOT NULL UNIQUE,
     IsVerified BIT NOT NULL DEFAULT 0,
     RefreshToken NVARCHAR(500) NULL,
-    RefreshTokenExpirationUTC DATETIME2 NULL
+    RefreshTokenExpirationUTC DATETIME2 NULL,
+    SecurityStamp DATETIME2 NULL
 );
 
--- Create Roles table
 CREATE TABLE Roles (
     RoleName NVARCHAR(100) PRIMARY KEY,
     RoleDescription NVARCHAR(500) NULL
 );
 
--- Create UsersAndRoles table (Junction table for Many-to-Many relationship)
 CREATE TABLE UsersAndRoles (
     Id INT IDENTITY(1,1) PRIMARY KEY,
     UserId INT NOT NULL,

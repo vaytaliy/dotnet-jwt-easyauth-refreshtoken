@@ -79,7 +79,8 @@ $@"UPDATE Users
 SET 
     Password = @Password,
     RefreshToken = NULL,
-    RefreshTokenExpirationUTC = NULL
+    RefreshTokenExpirationUTC = NULL,
+    SecurityStamp = @SecurityStamp
 WHERE Username = @Username";
 
             using var connection = _db.CreateConnection();
@@ -88,7 +89,8 @@ WHERE Username = @Username";
                 new
                 {
                     Password = password,
-                    Username = username
+                    Username = username,
+                    SecurityStamp = DateTime.UtcNow //Super important for security reasons
                 }
             );
 

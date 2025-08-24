@@ -15,5 +15,6 @@ namespace EasyAuth.Interfaces
         bool IsVerified { get; set; }
         string RefreshToken { get; set; }
         DateTime RefreshTokenExpirationUTC { get; set; }
+        DateTime SecurityStamp { get; set; }
     }
 }

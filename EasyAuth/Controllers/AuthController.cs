@@ -60,6 +60,7 @@ namespace EasyAuth.Controllers
             if (type == null || value == null) return BadRequest("type parameter must be equal to 'username' or 'email'. value parameter can't be empty");
             string foundUsername;
             string foundEmail;
+            DateTime securityStamp = DateTime.Now;
 
             if (type == "email")
             {
@@ -78,12 +79,13 @@ namespace EasyAuth.Controllers
 
                 foundUsername = foundUser.Username;
                 foundEmail = foundUser.Email;
+                securityStamp = foundUser.SecurityStamp;
             }
             else
             {
                 return BadRequest($"invalid type {type}, allowed 'username', 'email'");
             }
-            var ci = AuthTokenizationService.GetIdentity(foundUsername, foundEmail);
+            var ci = AuthTokenizationService.GetIdentity(foundUsername, foundEmail, securityStamp);
             var url = await _emailingService.SendRecoveryEmail(foundEmail, foundUsername, ci);
             return new JsonResult(new { url= url }) { StatusCode = 200 };
         }
@@ -97,6 +99,18 @@ namespace EasyAuth.Controllers
 
             var baseurl = _configuration["AuthSettings:BaseUrl"];
             return Redirect($"{baseurl}/recovery.html?recoveryToken={recoveryToken}");
+        }
+
+        [HttpGet("verification")]
+        public async Task<IActionResult> GetVerificationStatusPage([FromQuery] string verificationToken)
+        {
+            var res = await VerifyProfile(verificationToken);
+            if (res is OkObjectResult)
+            {
+                var baseurl = _configuration["AuthSettings:BaseUrl"];
+                return Redirect($"{baseurl}/verified_ok.html");
+            }
+            return NotFound();
         }
 
         [HttpPatch($"recovery")]
@@ -118,7 +132,8 @@ namespace EasyAuth.Controllers
         public async Task<ActionResult> ChangePassword([FromBody] ChangePasswordDto changePasswordDto)
         {
             var users = await _userRepository.GetUsersByEmail(changePasswordDto.Email);
-            var foundUser = users.FirstOrDefault(user => user.IsVerified == true);
+            var foundUser = users.FirstOrDefault();
+            if (foundUser == null) return NotFound("user not found");
 
             if (PasswordHasher.PasswordsMatch(foundUser.Password, foundUser.Username, changePasswordDto.OldPassword))
             {
@@ -172,11 +187,21 @@ namespace EasyAuth.Controllers
         {
             var username = User.Identity.Name;
             var email = User.FindFirst(ClaimTypes.Email).Value;
+            var securityStamp = DateTime.Parse(User.FindFirst("stamp").Value);
             var roles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+
+            var usersDb = await _userRepository.GetUsersByEmail(email);
+            var emailAlreadyUsed = usersDb.FirstOrDefault(u => u.IsVerified == true && u.Username == username);
+
+            if (emailAlreadyUsed != null)
+            {
+                return Ok("Email for your username is already verified");
+            }
 
             await _emailingService.SendVerificationEmail(
                     email,
                     username,
+                    securityStamp,
                     roles
                     );
 
@@ -284,7 +309,7 @@ namespace EasyAuth.Controllers
             }
 
             List<string> userRoles = await _userRepository.GetUserRoles(user.Username);
-            var identity = AuthTokenizationService.GetIdentity(user.Username, user.Email, user.IsVerified, userRoles);
+            var identity = AuthTokenizationService.GetIdentity(user.Username, user.Email, user.SecurityStamp, user.IsVerified, userRoles);
             var newAccessToken = _tokenizationService.GenerateAccessToken(identity);
             var newRefreshToken = _tokenizationService.GenerateRefreshToken();
 
